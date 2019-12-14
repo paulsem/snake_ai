@@ -293,20 +293,22 @@ class Snake(PyGameWrapper):
         if move[0] == 1 and self.player.dir.x != 1:
             self.direction = "left"
             self.player.dir = vec2d((-1, 0))
+            self.player.update_head = True
 
-        if move[1] == 1 and self.player.dir.x != -1:
+        elif move[1] == 1 and self.player.dir.x != -1:
             self.direction = "right"
             self.player.dir = vec2d((1, 0))
+            self.player.update_head = True
 
-        if move[2] == 1 and self.player.dir.y != 1:
+        elif move[2] == 1 and self.player.dir.y != 1:
             self.direction = "up"
             self.player.dir = vec2d((0, -1))
+            self.player.update_head = True
 
-        if move[3] == 1 and self.player.dir.y != -1:
+        elif move[3] == 1 and self.player.dir.y != -1:
             self.direction = "down"
             self.player.dir = vec2d((0, 1))
-
-        self.player.update_head = True
+            self.player.update_head = True
 
     def getEaten(self):
         if self.eaten:
@@ -439,7 +441,7 @@ if __name__ == "__main__":
     counter_games = 0
     score_plot = []
     counter_plot = []
-    record = 0
+    record = -10
     while counter_games < 150:
         # Initialize classes
         game = Snake(width=620, height=620)
@@ -471,7 +473,6 @@ if __name__ == "__main__":
 
             # set treward for the new state
             reward = agent.set_reward(game)
-            print(reward)
 
             # train short memory base on the new action and state
             agent.train_short_memory(state_old, final_move, reward, state_new, game.game_over())
@@ -482,6 +483,8 @@ if __name__ == "__main__":
 
         agent.replay_new(agent.memory)
         counter_games += 1
-        print('Game', counter_games, '      Score:', game.score)
-        score_plot.append(game.score)
+        if game.getScore() > record:
+            record = game.score
+        print('Game', counter_games, '      Score:', game.getScore(), '      Record:', record)
+        score_plot.append(game.getScore())
         counter_plot.append(counter_games)
