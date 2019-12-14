@@ -2,11 +2,20 @@ import pygame
 import sys
 import math
 
+import kerastut
 from base.pygamewrapper import PyGameWrapper
 from pygame.constants import K_w, K_a, K_s, K_d
 from utils.vec2d import vec2d
 from utils import percent_round_int
 
+import pygame
+from random import randint
+import numpy as np
+from keras.utils import to_categorical
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas
 
 class Food(pygame.sprite.Sprite):
 
@@ -242,6 +251,9 @@ class Snake(PyGameWrapper):
         self.INIT_POS = (width / 2, height / 2)
         self.init_length = init_length
 
+        self.eaten = False
+        self.direction = "right"
+
         self.BG_COLOR = (25, 25, 25)
 
     def _handle_player_events(self):
@@ -277,11 +289,33 @@ class Snake(PyGameWrapper):
 
                 self.player.update_head = True
 
+    def move(self, move):
+        if move[0] == 1 and self.player.dir.x != 1:
+            self.direction = "left"
+            self.player.dir = vec2d((-1, 0))
+
+        if move[1] == 1 and self.player.dir.x != -1:
+            self.direction = "right"
+            self.player.dir = vec2d((1, 0))
+
+        if move[2] == 1 and self.player.dir.y != 1:
+            self.direction = "up"
+            self.player.dir = vec2d((0, -1))
+
+        if move[3] == 1 and self.player.dir.y != -1:
+            self.direction = "down"
+            self.player.dir = vec2d((0, 1))
+
+        self.player.update_head = True
+
+    def getEaten(self):
+        if self.eaten:
+            self.eaten = False
+            return True
+        return self.eaten
+
     def getDirection(self):
-        try:
-            return self.direction
-        except AttributeError:
-            return "right"
+        return self.direction
 
     def getGameState(self):
         """
@@ -367,6 +401,7 @@ class Snake(PyGameWrapper):
         if hit:  # it hit
             self.score += self.rewards["positive"]
             self.player.grow()
+            self.eaten = True
             self.food.new_position(self.player)
 
         hits = pygame.sprite.spritecollide(
@@ -398,53 +433,55 @@ class Snake(PyGameWrapper):
 
 
 if __name__ == "__main__":
-    import numpy as np
-
     pygame.init()
-    game = Snake(width=620, height=620)
-    game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
-    game.clock = pygame.time.Clock()
-    game.rng = np.random.RandomState(24)
-    game.init()
+    agent = kerastut.DQNAgent()
 
-    while True:
-        if game.game_over():
-            game.init()
+    counter_games = 0
+    score_plot = []
+    counter_plot = []
+    record = 0
+    while counter_games < 150:
+        # Initialize classes
+        game = Snake(width=620, height=620)
+        game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
+        game.clock = pygame.time.Clock()
+        game.rng = np.random.RandomState()
+        game.init()
 
-        dt = game.clock.tick_busy_loop(30)
-        game.step(dt)
-        pygame.display.update()
-        state = game.getGameState()
+        while not game.game_over():
+            # agent.epsilon is set to give randomness to actions
+            agent.epsilon = 80 - counter_games
 
-        ok = False
-        left, right, up, down = 0, 0, 0, 0
-        x = 20
-        # print(state["snake_body_pos"])
-        dir = game.getDirection()
-        # print(state["snake_head_x"], state["snake_head_y"])
-        for body in state["snake_body_pos"]:
-            if ok:
-                for i in range(1, x):
-                    if not dir == "left" and (state["snake_head_x"] + i == int(body[0]) or state["snake_head_x"] + i >= 620):
-                        right = 1
-                    if not dir == "right" and (state["snake_head_x"] - i == int(body[0])or state["snake_head_x"] - i <= 0):
-                        left = 1
-                    if not dir == "down" and (state["snake_head_y"] + i == int(body[1])or state["snake_head_y"] + i >= 620):
-                        up = 1
-                    if not dir == "up" and (state["snake_head_y"] - i == int(body[1])or state["snake_head_y"] - i <= 0):
-                        down = 1
+            # get old state
+            state_old = agent.makeState(game)
+
+            # perform random actions based on agent.epsilon, or choose the action
+            if randint(0, 200) < agent.epsilon:
+                final_move = to_categorical(randint(0, 3), num_classes=4)
             else:
-                ok = True
-        print(left, right, up, down)
+                # predict action based on the old state
+                prediction = agent.model.predict(state_old.reshape((1, 8)))
+                final_move = to_categorical(np.argmax(prediction[0]), num_classes=4)
 
-        """
+            # perform new move and get new state
+            game.move(final_move)
+            dt = game.clock.tick_busy_loop(30)
+            game.step(dt)
+            state_new = agent.makeState(game)
 
-        state = {
-            "snake_head_x": self.player.head.pos.x,
-            "snake_head_y": self.player.head.pos.y,
-            "food_x": self.food.pos.x,
-            "food_y": self.food.pos.y,
-            "snake_body": [],
-            "snake_body_pos": [],
-        }
-        """
+            # set treward for the new state
+            reward = agent.set_reward(game)
+            print(reward)
+
+            # train short memory base on the new action and state
+            agent.train_short_memory(state_old, final_move, reward, state_new, game.game_over())
+
+            # store the new data into a long term memory
+            agent.remember(state_old, final_move, reward, state_new, game.game_over())
+            pygame.display.update()
+
+        agent.replay_new(agent.memory)
+        counter_games += 1
+        print('Game', counter_games, '      Score:', game.score)
+        score_plot.append(game.score)
+        counter_plot.append(counter_games)
