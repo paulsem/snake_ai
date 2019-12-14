@@ -2,12 +2,10 @@ import pygame
 import sys
 import math
 
-#import .base
-from ple.games.base.pygamewrapper import PyGameWrapper
-
+from base.pygamewrapper import PyGameWrapper
 from pygame.constants import K_w, K_a, K_s, K_d
-from ple.games.utils.vec2d import vec2d
-from ple.games.utils import percent_round_int
+from utils.vec2d import vec2d
+from utils import percent_round_int
 
 
 class Food(pygame.sprite.Sprite):
@@ -259,20 +257,31 @@ class Snake(PyGameWrapper):
                 #right = 1
                 #up = -1
                 #down = 1
+                self.key = key
 
                 if key == self.actions["left"] and self.player.dir.x != 1:
+                    self.direction = "left"
                     self.player.dir = vec2d((-1, 0))
 
                 if key == self.actions["right"] and self.player.dir.x != -1:
+                    self.direction = "right"
                     self.player.dir = vec2d((1, 0))
 
                 if key == self.actions["up"] and self.player.dir.y != 1:
+                    self.direction = "up"
                     self.player.dir = vec2d((0, -1))
 
                 if key == self.actions["down"] and self.player.dir.y != -1:
+                    self.direction = "down"
                     self.player.dir = vec2d((0, 1))
 
                 self.player.update_head = True
+
+    def getDirection(self):
+        try:
+            return self.direction
+        except AttributeError:
+            return "right"
 
     def getGameState(self):
         """
@@ -405,4 +414,37 @@ if __name__ == "__main__":
         dt = game.clock.tick_busy_loop(30)
         game.step(dt)
         pygame.display.update()
-        print(game.getScore())
+        state = game.getGameState()
+
+        ok = False
+        left, right, up, down = 0, 0, 0, 0
+        x = 20
+        # print(state["snake_body_pos"])
+        dir = game.getDirection()
+        # print(state["snake_head_x"], state["snake_head_y"])
+        for body in state["snake_body_pos"]:
+            if ok:
+                for i in range(1, x):
+                    if not dir == "left" and (state["snake_head_x"] + i == int(body[0]) or state["snake_head_x"] + i >= 620):
+                        right = 1
+                    if not dir == "right" and (state["snake_head_x"] - i == int(body[0])or state["snake_head_x"] - i <= 0):
+                        left = 1
+                    if not dir == "down" and (state["snake_head_y"] + i == int(body[1])or state["snake_head_y"] + i >= 620):
+                        up = 1
+                    if not dir == "up" and (state["snake_head_y"] - i == int(body[1])or state["snake_head_y"] - i <= 0):
+                        down = 1
+            else:
+                ok = True
+        print(left, right, up, down)
+
+        """
+
+        state = {
+            "snake_head_x": self.player.head.pos.x,
+            "snake_head_y": self.player.head.pos.y,
+            "food_x": self.food.pos.x,
+            "food_y": self.food.pos.y,
+            "snake_body": [],
+            "snake_body_pos": [],
+        }
+        """
