@@ -1,26 +1,20 @@
 import pygame
 import sys
 import math
+import numpy as np
+import best_sneic
 
-import kerastut
 from base.pygamewrapper import PyGameWrapper
 from pygame.constants import K_w, K_a, K_s, K_d
 from utils.vec2d import vec2d
 from utils import percent_round_int
-
-import pygame
 from random import randint
-import numpy as np
 from keras.utils import to_categorical
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-import pandas
+
 
 class Food(pygame.sprite.Sprite):
 
-    def __init__(self, pos_init, width, color,
-                 SCREEN_WIDTH, SCREEN_HEIGHT, rng):
+    def __init__(self, pos_init, width, color, SCREEN_WIDTH, SCREEN_HEIGHT, rng):
         pygame.sprite.Sprite.__init__(self)
 
         self.pos = vec2d(pos_init)
@@ -34,12 +28,7 @@ class Food(pygame.sprite.Sprite):
         image = pygame.Surface((width, width))
         image.fill((0, 0, 0, 0))
         image.set_colorkey((0, 0, 0))
-        pygame.draw.rect(
-            image,
-            color,
-            (0, 0, self.width, self.width),
-            0
-        )
+        pygame.draw.rect(image, color, (0, 0, self.width, self.width), 0)
 
         self.image = image
         self.rect = self.image.get_rect()
@@ -49,15 +38,9 @@ class Food(pygame.sprite.Sprite):
         new_pos = snake.body[0].pos
         snake_body = [s.pos for s in snake.body]
 
-        while (new_pos in snake_body):
-            _x = self.rng.choice(range(
-                self.width * 2, self.SCREEN_WIDTH - self.width * 2, self.width
-            ))
-
-            _y = self.rng.choice(range(
-                self.width * 2, self.SCREEN_HEIGHT - self.width * 2, self.width
-            ))
-
+        while new_pos in snake_body:
+            _x = self.rng.choice(range(self.width * 2, self.SCREEN_WIDTH - self.width * 2, self.width))
+            _y = self.rng.choice(range(self.width * 2, self.SCREEN_HEIGHT - self.width * 2, self.width))
             new_pos = vec2d((_x, _y))
 
         self.pos = new_pos
@@ -81,12 +64,7 @@ class SnakeSegment(pygame.sprite.Sprite):
         image.fill((0, 0, 0))
         image.set_colorkey((0, 0, 0))
 
-        pygame.draw.rect(
-            image,
-            color,
-            (0, 0, self.width, self.height),
-            0
-        )
+        pygame.draw.rect(image, color, (0, 0, self.width, self.height), 0)
 
         self.image = image
         # use half the size
@@ -98,10 +76,9 @@ class SnakeSegment(pygame.sprite.Sprite):
 
 
 # basically just holds onto all of them
-class SnakePlayer():
+class SnakePlayer:
 
-    def __init__(self, speed, length, pos_init, width,
-                 color, SCREEN_WIDTH, SCREEN_HEIGHT):
+    def __init__(self, speed, length, pos_init, width, color, SCREEN_WIDTH, SCREEN_HEIGHT):
         self.dir = vec2d((1, 0))
         self.speed = speed
         self.pos = vec2d(pos_init)
@@ -116,7 +93,7 @@ class SnakePlayer():
             self.body.append(
                 # makes a neat "zapping" in effect
                 SnakeSegment(
-                            (self.pos.x - (width) * i, self.pos.y),
+                    (self.pos.x - width * i, self.pos.y),
                     self.width,
                     self.width,
                     tuple([c - 100 for c in self.color]
@@ -177,12 +154,7 @@ class SnakePlayer():
             image.fill((0, 0, 0))
             image.set_colorkey((0, 0, 0))
 
-            pygame.draw.rect(
-                image,
-                (255, 0, 0),
-                (0, 0, w, h),
-                0
-            )
+            pygame.draw.rect(image, (255, 0, 0), (0, 0, w, h), 0)
 
             self.head.image = image
             self.head.rect = self.head.image.get_rect()
@@ -198,7 +170,7 @@ class SnakePlayer():
 
         self.body.append(
             SnakeSegment(
-                        (last.x, last.y),  # initially off screen?
+                (last.x, last.y),  # initially off screen?
                 self.width,
                 self.width,
                 color
@@ -265,10 +237,10 @@ class Snake(PyGameWrapper):
             if event.type == pygame.KEYDOWN:
                 key = event.key
 
-                #left = -1
-                #right = 1
-                #up = -1
-                #down = 1
+                # left = -1
+                # right = 1
+                # up = -1
+                # down = 1
                 self.key = key
 
                 if key == self.actions["left"] and self.player.dir.x != 1:
@@ -290,22 +262,22 @@ class Snake(PyGameWrapper):
                 self.player.update_head = True
 
     def move(self, move):
-        if move[0] == 1 and self.player.dir.x != 1:
+        if int(move[0]) == 1 and self.player.dir.x != 1:
             self.direction = "left"
             self.player.dir = vec2d((-1, 0))
             self.player.update_head = True
 
-        elif move[1] == 1 and self.player.dir.x != -1:
+        elif int(move[1]) == 1 and self.player.dir.x != -1:
             self.direction = "right"
             self.player.dir = vec2d((1, 0))
             self.player.update_head = True
 
-        elif move[2] == 1 and self.player.dir.y != 1:
+        elif int(move[2]) == 1 and self.player.dir.y != 1:
             self.direction = "up"
             self.player.dir = vec2d((0, -1))
             self.player.update_head = True
 
-        elif move[3] == 1 and self.player.dir.y != -1:
+        elif int(move[3]) == 1 and self.player.dir.y != -1:
             self.direction = "down"
             self.player.dir = vec2d((0, 1))
             self.player.update_head = True
@@ -347,14 +319,18 @@ class Snake(PyGameWrapper):
 
         for s in self.player.body:
             dist = math.sqrt((self.player.head.pos.x - s.pos.x)
-                             ** 2 + (self.player.head.pos.y - s.pos.y)**2)
+                             ** 2 + (self.player.head.pos.y - s.pos.y) ** 2)
             state["snake_body"].append(dist)
             state["snake_body_pos"].append([s.pos.x, s.pos.y])
 
         return state
 
     def getScore(self):
-        return self.score
+        return int(self.score)
+
+    def getDeath(self):
+        if self.game_over():
+            return self.cause_of_death
 
     def game_over(self):
         return self.lives == -1
@@ -410,23 +386,25 @@ class Snake(PyGameWrapper):
             self.player.head, self.player.body_group, False)
         if len(hits) > 0:
             self.lives = -1
+            self.cause_of_death = "Itself"
 
         x_check = (
-            self.player.head.pos.x < 0) or (
-            self.player.head.pos.x +
-            self.player_width /
-            2 > self.width)
+                          self.player.head.pos.x < 0) or (
+                          self.player.head.pos.x +
+                          self.player_width /
+                          2 > self.width)
         y_check = (
-            self.player.head.pos.y < 0) or (
-            self.player.head.pos.y +
-            self.player_width /
-            2 > self.height)
+                          self.player.head.pos.y < 0) or (
+                          self.player.head.pos.y +
+                          self.player_width /
+                          2 > self.height)
 
         if x_check or y_check:
             self.lives = -1
+            self.cause_of_death = "Wall"
 
-        if self.lives <= 0.0:
-            self.score += self.rewards["loss"]
+        # if self.lives <= 0.0:
+        #     self.score += self.rewards["loss"]
 
         self.player.update(dt)
 
@@ -436,13 +414,11 @@ class Snake(PyGameWrapper):
 
 if __name__ == "__main__":
     pygame.init()
-    agent = kerastut.DQNAgent()
+    agent = best_sneic.BestAI()
 
-    counter_games = 0
-    score_plot = []
-    counter_plot = []
-    record = -10
-    while counter_games < 150:
+    iteration = 0
+    record = 0
+    while iteration < 200:
         # Initialize classes
         game = Snake(width=620, height=620)
         game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
@@ -452,27 +428,27 @@ if __name__ == "__main__":
 
         while not game.game_over():
             # agent.epsilon is set to give randomness to actions
-            agent.epsilon = 80 - counter_games
+            epsilon = 50 - iteration
 
             # get old state
-            state_old = agent.makeState(game)
+            state_old = best_sneic.makeState(game)
 
             # perform random actions based on agent.epsilon, or choose the action
-            if randint(0, 200) < agent.epsilon:
-                final_move = to_categorical(randint(0, 3), num_classes=4)
+            if randint(0, 200) < epsilon:
+                final_move = to_categorical(randint(0, agent.output - 1), num_classes=agent.output)
             else:
                 # predict action based on the old state
-                prediction = agent.model.predict(state_old.reshape((1, 8)))
-                final_move = to_categorical(np.argmax(prediction[0]), num_classes=4)
+                prediction = agent.model.predict(state_old.reshape((1, agent.input)))
+                final_move = to_categorical(np.argmax(prediction[0]), num_classes=agent.output)
 
             # perform new move and get new state
             game.move(final_move)
             dt = game.clock.tick_busy_loop(30)
             game.step(dt)
-            state_new = agent.makeState(game)
+            state_new = best_sneic.makeState(game)
 
-            # set treward for the new state
-            reward = agent.set_reward(game)
+            # set the reward for the new state
+            reward = agent.makeReward(game)
 
             # train short memory base on the new action and state
             agent.train_short_memory(state_old, final_move, reward, state_new, game.game_over())
@@ -482,9 +458,7 @@ if __name__ == "__main__":
             pygame.display.update()
 
         agent.replay_new(agent.memory)
-        counter_games += 1
+        iteration += 1
         if game.getScore() > record:
-            record = game.score
-        print('Game', counter_games, '      Score:', game.getScore(), '      Record:', record)
-        score_plot.append(game.getScore())
-        counter_plot.append(counter_games)
+            record = game.getScore()
+        print("Iter:", iteration, "    Score:", game.getScore(), "    Record:", record, "    Death:", game.getDeath())
