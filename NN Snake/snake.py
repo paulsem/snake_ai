@@ -367,6 +367,40 @@ class Snake(PyGameWrapper):
         self.ticks = 0
         self.lives = 1
 
+    def makeState(self):
+        state, direction = self.getGameState(), self.getDirection()
+
+        ok = False
+        left, right, up, down = 0, 0, 0, 0
+        x = 30
+        for body in state["snake_body_pos"]:
+            if ok:
+                for i in range(1, x):
+                    if not direction == "left" and (
+                            state["snake_head_x"] + i == int(body[0]) or state["snake_head_x"] + i >= 600):
+                        right = 1
+                    if not direction == "right" and (
+                            state["snake_head_x"] - i == int(body[0]) or state["snake_head_x"] - i <= 0):
+                        left = 1
+                    if not direction == "up" and (
+                            state["snake_head_y"] + i == int(body[1]) or state["snake_head_y"] + i >= 600):
+                        down = 1
+                    if not direction == "down" and (
+                            state["snake_head_y"] - i == int(body[1]) or state["snake_head_y"] - i <= 0):
+                        up = 1
+
+            else:
+                ok = True
+        ai_state = [left, right, up, down,
+                    state["food_x"] < state["snake_head_x"], state["food_x"] > state["snake_head_x"],
+                    state["food_y"] < state["snake_head_y"], state["food_y"] > state["snake_head_y"]]
+        for i in range(4, len(ai_state)):
+            if ai_state[i]:
+                ai_state[i] = 1
+            else:
+                ai_state[i] = 0
+        return np.asarray(ai_state)
+
     def step(self, dt):
         """
             Perform one step of game emulation.
@@ -438,7 +472,7 @@ if __name__ == "__main__":
                     epsilon = 200 - iteration
 
                 # get old state
-                state_old = best_sneic.makeState(game)
+                state_old = game.makeState()
 
                 # perform random actions based on agent.epsilon, or choose the action
                 if randint(0, 500) < epsilon:
@@ -452,7 +486,7 @@ if __name__ == "__main__":
                 game.makeMove(final_move)
                 dt = game.clock.tick_busy_loop(30)
                 game.step(dt)
-                state_new = best_sneic.makeState(game)
+                state_new = game.makeState()
 
                 # set the reward for the new state
                 reward = agent.makeReward(game)

@@ -7,41 +7,6 @@ import numpy as np
 import math
 
 
-def makeState(game):
-    state, direction = game.getGameState(), game.getDirection()
-
-    ok = False
-    left, right, up, down = 0, 0, 0, 0
-    x = 30
-    for body in state["snake_body_pos"]:
-        if ok:
-            for i in range(1, x):
-                if not direction == "left" and (
-                        state["snake_head_x"] + i == int(body[0]) or state["snake_head_x"] + i >= 600):
-                    right = 1
-                if not direction == "right" and (
-                        state["snake_head_x"] - i == int(body[0]) or state["snake_head_x"] - i <= 0):
-                    left = 1
-                if not direction == "up" and (
-                        state["snake_head_y"] + i == int(body[1]) or state["snake_head_y"] + i >= 600):
-                    down = 1
-                if not direction == "down" and (
-                        state["snake_head_y"] - i == int(body[1]) or state["snake_head_y"] - i <= 0):
-                    up = 1
-
-        else:
-            ok = True
-    ai_state = [left, right, up, down,
-                state["food_x"] < state["snake_head_x"], state["food_x"] > state["snake_head_x"],
-                state["food_y"] < state["snake_head_y"], state["food_y"] > state["snake_head_y"]]
-    for i in range(4, len(ai_state)):
-        if ai_state[i]:
-            ai_state[i] = 1
-        else:
-            ai_state[i] = 0
-    return np.asarray(ai_state)
-
-
 class BestAI(object):
 
     def __init__(self):
@@ -56,7 +21,8 @@ class BestAI(object):
         self.reward = 0
         self.final_reward = 0
 
-        self.model = self.makeModel(weights="best_sneic_21.h5")
+        self.model = self.makeModel()
+        # self.model = self.makeModel(weights="best_sneic_21.h5")
         self.memory = []
 
     def makeReward(self, game):
