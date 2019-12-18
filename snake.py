@@ -261,7 +261,7 @@ class Snake(PyGameWrapper):
 
                 self.player.update_head = True
 
-    def move(self, move):
+    def makeMove(self, move):
         if int(move[0]) == 1 and self.player.dir.x != 1:
             self.direction = "left"
             self.player.dir = vec2d((-1, 0))
@@ -281,6 +281,9 @@ class Snake(PyGameWrapper):
             self.direction = "down"
             self.player.dir = vec2d((0, 1))
             self.player.update_head = True
+        else:
+            move[randint(0, 3)] = 1
+            self.makeMove(move)
 
     def getEaten(self):
         if self.eaten:
@@ -364,6 +367,47 @@ class Snake(PyGameWrapper):
         self.ticks = 0
         self.lives = 1
 
+    def makeState(self):
+        state, direction = self.getGameState(), self.getDirection()
+
+        ok = False
+        left, right, up, down = 0, 0, 0, 0
+        x = 30
+
+        for body in state["snake_body_pos"]:
+            if ok:
+                for i in range(1, x):
+                    if not direction == "left" and (
+                            int(state["snake_head_x"]) + i == int(body[0]) or state["snake_head_x"] + i >= 600):
+                        right = 1
+                        #print("danger right")
+                    elif not direction == "right" and (
+                            int(state["snake_head_x"]) - i == int(body[0]) or state["snake_head_x"] - i <= 0):
+                        left = 1
+                        #print("danger left")
+                    elif not direction == "up" and (
+                            int(state["snake_head_y"]) + i == int(body[1]) or state["snake_head_y"] + i >= 600):
+                        #print("danger down")
+                        down = 1
+                    elif not direction == "down" and (
+                            int(state["snake_head_y"]) - i == int(body[1]) or state["snake_head_y"] - i <= 0):
+                        #print("danger up")
+                        up = 1
+
+            else:
+                ok = True
+
+        ai_state = [left, right, up, down,
+                    state["food_x"] < state["snake_head_x"], state["food_x"] > state["snake_head_x"],
+                    state["food_y"] < state["snake_head_y"], state["food_y"] > state["snake_head_y"]]
+        for i in range(4, len(ai_state)):
+            if ai_state[i]:
+                ai_state[i] = 1
+            else:
+                ai_state[i] = 0
+        #print(ai_state)
+        return np.asarray(ai_state)
+
     def step(self, dt):
         """
             Perform one step of game emulation.
@@ -403,6 +447,7 @@ class Snake(PyGameWrapper):
             self.lives = -1
             self.cause_of_death = "Wall"
 
+
         # if self.lives <= 0.0:
         #     self.score += self.rewards["loss"]
 
@@ -414,51 +459,60 @@ class Snake(PyGameWrapper):
 
 if __name__ == "__main__":
     pygame.init()
-    agent = best_sneic.BestAI()
+    forever = True
+    total = 0
 
-    iteration = 0
-    record = 0
-    while iteration < 200:
-        # Initialize classes
-        game = Snake(width=620, height=620)
-        game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
-        game.clock = pygame.time.Clock()
-        game.rng = np.random.RandomState()
-        game.init()
+    while forever:
+        agent = best_sneic.BestAI()
+        iteration = 0
+        record = 0
+        epsilon = 0
+        while iteration < 400:
+            # Initialize classes
+            game = Snake(width=620, height=620)
+            game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
+            game.clock = pygame.time.Clock()
+            game.rng = np.random.RandomState()
+            game.init()
 
-        while not game.game_over():
-            # agent.epsilon is set to give randomness to actions
-            epsilon = 50 - iteration
+            while not game.game_over():
+                # agent.epsilon is set to give randomness to actions
+                if not agent.weights:
+                    epsilon = 200 - iteration
 
-            # get old state
-            state_old = best_sneic.makeState(game)
+                # get old state
+                state_old = game.makeState()
 
-            # perform random actions based on agent.epsilon, or choose the action
-            if randint(0, 200) < epsilon:
-                final_move = to_categorical(randint(0, agent.output - 1), num_classes=agent.output)
-            else:
-                # predict action based on the old state
-                prediction = agent.model.predict(state_old.reshape((1, agent.input)))
-                final_move = to_categorical(np.argmax(prediction[0]), num_classes=agent.output)
+                # perform random actions based on agent.epsilon, or choose the action
+                if randint(0, 500) < epsilon:
+                    final_move = to_categorical(randint(0, agent.output - 1), num_classes=agent.output)
+                else:
+                    # predict action based on the old state
+                    prediction = agent.model.predict(state_old.reshape((1, agent.input)))
+                    final_move = to_categorical(np.argmax(prediction[0]), num_classes=agent.output)
 
-            # perform new move and get new state
-            game.move(final_move)
-            dt = game.clock.tick_busy_loop(30)
-            game.step(dt)
-            state_new = best_sneic.makeState(game)
+                # perform new move and get new state
+                game.makeMove(final_move)
+                dt = game.clock.tick_busy_loop(30)
+                game.step(dt)
+                state_new = game.makeState()
 
-            # set the reward for the new state
-            reward = agent.makeReward(game)
+                # set the reward for the new state
+                reward = agent.makeReward(game)
 
-            # train short memory base on the new action and state
-            agent.train_short_memory(state_old, final_move, reward, state_new, game.game_over())
+                # train short memory base on the new action and state
+                agent.trainMemory(state_old, final_move, reward, state_new, game.game_over())
 
-            # store the new data into a long term memory
-            agent.remember(state_old, final_move, reward, state_new, game.game_over())
-            pygame.display.update()
+                # store the new data into a long term memory
+                agent.makeMemory(state_old, final_move, reward, state_new, game.game_over())
+                pygame.display.update()
 
-        agent.replay_new(agent.memory)
-        iteration += 1
-        if game.getScore() > record:
-            record = game.getScore()
-        print("Iter:", iteration, "    Score:", game.getScore(), "    Record:", record, "    Death:", game.getDeath())
+            # agent.replay_new(agent.memory)
+            iteration += 1
+            if game.getScore() > record:
+                record = game.getScore()
+            total += game.getScore()
+
+            print("Iter:", iteration, "    Score:", game.getScore(),"   Average:",total/iteration, "    Record:", record, "    Death:",
+                  game.getDeath())
+            agent.model.save_weights("cel_mai_smecher.h5")
