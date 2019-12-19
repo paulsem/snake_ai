@@ -22,10 +22,11 @@ class BestAI(object):
         self.final_reward = 0
 
         self.model = self.makeModel()
-        #self.model = self.makeModel(weights="best_sneic_25.h5")
+        self.model = self.makeModel(weights="cel_mai_smecher.h5")
         self.memory = []
 
     def makeReward(self, game):
+        self.reward -= 0.001
         self.final_reward = 0
         if game.game_over():
             self.reward = 0
@@ -56,13 +57,19 @@ class BestAI(object):
             model.load_weights(weights)
         return model
 
-    def makeMemory(self, state, action, reward, next_state, over):
-        self.memory.append((state, action, reward, next_state, over))
+    def makeMemory(self, tmp_memory):
+        self.memory.append(tmp_memory[0])
 
-    def trainMemory(self, state, action, reward, next_state, over):
-        target = reward
-        if not over:
-            target = reward + self.y * np.amax(self.model.predict(np.array([next_state]))[0])
-        target_f = self.model.predict(np.array([state]))
-        target_f[0][np.argmax(action)] = target
-        self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
+    def trainMemory(self, game, tmp_memory):
+        if len(tmp_memory) > 1:
+            sample = random.sample(tmp_memory, int(1 / game.getIteration() * len(tmp_memory)))
+        else:
+            sample = tmp_memory
+
+        for old_states, move, reward, next_state, over in sample:
+            tmp_target = reward
+            if not over:
+                tmp_target = reward + self.y * np.amax(self.model.predict(np.array([next_state]))[0])
+            target = self.model.predict(np.array([old_states]))
+            target[0][np.argmax(move)] = tmp_target
+            self.model.fit(np.array([old_states]), target, epochs=1, verbose=0)

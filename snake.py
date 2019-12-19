@@ -376,22 +376,22 @@ class Snake(PyGameWrapper):
 
         for body in state["snake_body_pos"]:
             if ok:
-                for i in range(1, x):
+                for i in range(0, x):
                     if not direction == "left" and (
                             int(state["snake_head_x"]) + i == int(body[0]) or state["snake_head_x"] + i >= 600):
                         right = 1
-                        #print("danger right")
-                    elif not direction == "right" and (
+                        # print("danger right")
+                    if not direction == "right" and (
                             int(state["snake_head_x"]) - i == int(body[0]) or state["snake_head_x"] - i <= 0):
                         left = 1
-                        #print("danger left")
-                    elif not direction == "up" and (
+                        # print("danger left")
+                    if not direction == "up" and (
                             int(state["snake_head_y"]) + i == int(body[1]) or state["snake_head_y"] + i >= 600):
-                        #print("danger down")
+                        # print("danger down")
                         down = 1
-                    elif not direction == "down" and (
+                    if not direction == "down" and (
                             int(state["snake_head_y"]) - i == int(body[1]) or state["snake_head_y"] - i <= 0):
-                        #print("danger up")
+                        # print("danger up")
                         up = 1
 
             else:
@@ -405,8 +405,14 @@ class Snake(PyGameWrapper):
                 ai_state[i] = 1
             else:
                 ai_state[i] = 0
-        #print(ai_state)
+        # print(ai_state)
         return np.asarray(ai_state)
+
+    def setIteration(self, iter):
+        self.iteration = iter
+
+    def getIteration(self):
+        return self.iteration
 
     def step(self, dt):
         """
@@ -447,7 +453,6 @@ class Snake(PyGameWrapper):
             self.lives = -1
             self.cause_of_death = "Wall"
 
-
         # if self.lives <= 0.0:
         #     self.score += self.rewards["loss"]
 
@@ -459,60 +464,53 @@ class Snake(PyGameWrapper):
 
 if __name__ == "__main__":
     pygame.init()
-    forever = True
     total = 0
+    # game = Snake(width=128, height=128)
 
-    while forever:
+    while True:
+        total = 0
         agent = best_sneic.BestAI()
-        iteration = 0
+        nr_iteratii = 1
         record = 0
         epsilon = 0
-        while iteration < 400:
+        while nr_iteratii < 400:
             # Initialize classes
             game = Snake(width=620, height=620)
+            game.speed = 1000
             game.screen = pygame.display.set_mode(game.getScreenDims(), 0, 32)
             game.clock = pygame.time.Clock()
             game.rng = np.random.RandomState()
             game.init()
+            game.setIteration(nr_iteratii)
 
             while not game.game_over():
-                # agent.epsilon is set to give randomness to actions
                 if not agent.weights:
-                    epsilon = 200 - iteration
+                    epsilon = 200 - nr_iteratii
 
-                # get old state
-                state_old = game.makeState()
-
-                # perform random actions based on agent.epsilon, or choose the action
+                old_state = game.makeState()
                 if randint(0, 500) < epsilon:
-                    final_move = to_categorical(randint(0, agent.output - 1), num_classes=agent.output)
+                    move = to_categorical(randint(0, agent.output - 1), num_classes=agent.output)
                 else:
-                    # predict action based on the old state
-                    prediction = agent.model.predict(state_old.reshape((1, agent.input)))
-                    final_move = to_categorical(np.argmax(prediction[0]), num_classes=agent.output)
+                    prediction = agent.model.predict(old_state.reshape((1, agent.input)))
+                    move = to_categorical(np.argmax(prediction[0]), num_classes=agent.output)
 
-                # perform new move and get new state
-                game.makeMove(final_move)
-                dt = game.clock.tick_busy_loop(30)
+                game.makeMove(move)
+                dt = game.clock.tick_busy_loop(0)
                 game.step(dt)
-                state_new = game.makeState()
-
-                # set the reward for the new state
                 reward = agent.makeReward(game)
+                new_state = game.makeState()
 
-                # train short memory base on the new action and state
-                agent.trainMemory(state_old, final_move, reward, state_new, game.game_over())
-
-                # store the new data into a long term memory
-                agent.makeMemory(state_old, final_move, reward, state_new, game.game_over())
+                tmp_memory = [(old_state, move, reward, new_state, game.game_over())]
+                agent.makeMemory(tmp_memory)
+                agent.trainMemory(game, tmp_memory)
                 pygame.display.update()
 
-            # agent.replay_new(agent.memory)
-            iteration += 1
+            agent.trainMemory(game, agent.memory)
+
             if game.getScore() > record:
                 record = game.getScore()
             total += game.getScore()
-
-            print("Iter:", iteration, "    Score:", game.getScore(),"   Average:",total/iteration, "    Record:", record, "    Death:",
-                  game.getDeath())
-            agent.model.save_weights("cel_mai_smecher.h5")
+            print("Iter:", nr_iteratii, "    Score:", game.getScore(), "    Record:", record, "    Death cause:",
+                  game.getDeath(), "   Average:", total / nr_iteratii)
+            nr_iteratii += 1
+        agent.model.save_weights("cel_mai_smecher.h5")
